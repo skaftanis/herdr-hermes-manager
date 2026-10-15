@@ -13,6 +13,7 @@ import unicodedata
 from .core import clean_text, job_enabled, load_conversations, load_jobs, read_json
 from .control import manager_pane
 from .bots import open_bot
+from .inbox import load_inbox, mark_all_read, open_inbox, unread_summary
 
 
 def relative_time(value):
@@ -44,10 +45,10 @@ def schedule_text(job):
 class Sidebar:
     def __init__(self, manager, profile):
         self.manager, self.profile = manager, profile
-        self.jobs, self.conversations, self.bots = [], [], []
+        self.jobs, self.conversations, self.bots, self.inbox = [], [], [], []
         self.section = "jobs"
-        self.selected = {"jobs": 0, "conversations": 0, "bots": 0}
-        self.offset = {"jobs": 0, "conversations": 0, "bots": 0}
+        self.selected = {"jobs": 0, "conversations": 0, "bots": 0, "inbox": 0}
+        self.offset = {"jobs": 0, "conversations": 0, "bots": 0, "inbox": 0}
         self.bot_columns = 3
         self.include_background = False
         self.detail = None
@@ -72,7 +73,8 @@ class Sidebar:
         if self.refresh_future is None:
             def load():
                 return (load_jobs(self.profile), load_conversations(
-                    self.profile, self.manager.settings.conversation_limit, self.include_background), self.load_bots())
+                    self.profile, self.manager.settings.conversation_limit, self.include_background), self.load_bots(),
+                        self.load_inbox())
             self.refresh_future = self.executor.submit(load)
             self.last_refresh = time.monotonic()
 
@@ -87,8 +89,8 @@ class Sidebar:
             try:
                 # Keep selection on the same job/chat if new activity changes the ordering.
                 chosen = {s: self.current(s).get("id") if self.current(s) else None
-                          for s in ("jobs", "conversations", "bots")}
-                self.jobs, self.conversations, self.bots = self.refresh_future.result()
+                          for s in ("jobs", "conversations", "bots", "inbox")}
+                self.jobs, self.conversations, self.bots, self.inbox = self.refresh_future.result()
                 for section in chosen:
                     rows = self.rows(section)
                     self.selected[section] = next((i for i, row in enumerate(rows) if row.get("id") == chosen[section]),
@@ -123,7 +125,26 @@ class Sidebar:
             self.last_sync = now
 
     def rows(self, section=None):
-        return {"jobs": self.jobs, "conversations": self.conversations, "bots": self.bots}[section or self.section]
+        return {"jobs": self.jobs, "conversations": self.conversations, "bots": self.bots,
+                "inbox": self.inbox}[section or self.section]
+
+    def load_inbox(self):
+        try:
+            # Only this profile's runs, and only the ones that actually have something to read.
+            return load_inbox(self.manager.settings, self.profile.name, include_silent=False)
+        except (OSError, ValueError) as exc:
+            self.status, self.status_error = "Inbox unavailable: " + str(exc), True
+            return self.inbox
+
+    def open_inbox(self):
+        item = self.current("inbox") or next((i for i in self.inbox if i.get("unread")), None)
+        if item:
+            self.action(lambda: open_inbox(self.manager.settings, self.manager.api, item["id"]), "Opened notification")
+            item["unread"] = False
+
+    def mark_inbox_read(self):
+        items = list(self.inbox)
+        self.action(lambda: mark_all_read(self.manager.settings, items), "All notifications marked read")
 
     def load_bots(self):
         profiles = self.manager.settings.profiles()
@@ -240,7 +261,10 @@ class Sidebar:
             self.bot_columns = max(2, min(4, (width-2)//12))
             bot_rows = max(1, (len(self.bots)+self.bot_columns-1)//self.bot_columns)
             bots_height = min(2 + bot_rows*2, max(4, (height-10)//3))
-            bots_y = content_bottom - bots_height
+            # 3 rows on a 40-row sidebar, one more for every 4 extra rows of height, up to 10.
+            inbox_rows = min(10, 3 + (height - 40) // 4) if height >= 40 else 0
+            inbox_height = 1 + inbox_rows
+            bots_y = content_bottom - inbox_height - 1 - bots_height
             jobs_height = min(max(4, len(self.jobs)*3+2), max(4, (bots_y-3)//2))
             chats_y = 3 + jobs_height + 1
             enabled = sum(job_enabled(j) for j in self.jobs)
@@ -254,14 +278,16 @@ class Sidebar:
             self.render_rows("conversations", chats_y+1, bots_y-chats_y-1, 2, width)
             self.line(bots_y)
             self.render_bots(bots_y+1, bots_height-1, width)
+            self.line(bots_y+bots_height)
+            self.render_inbox(bots_y+bots_height+1, inbox_rows, width)
             self.line(content_bottom)
             self.put(height-6, 1, "Tab switch  Space toggle  Enter open", curses.A_DIM)
             self.put(height-5, 1, "n new chat   d details   e edit job", curses.A_DIM)
-            self.put(height-4, 1, "b bots  r refresh  a all  Esc terminal", curses.A_DIM)
+            self.put(height-4, 1, "b bots  i inbox  r refresh  Esc terminal", curses.A_DIM)
             self.hitboxes.extend([(height-5, 1, 12, "new", None),
                                   (height-4, 1, 6, "bots", None),
-                                  (height-4, 9, 17, "refresh", None),
-                                  (height-4, 20, 24, "all", None)])
+                                  (height-4, 9, 16, "inbox", None),
+                                  (height-4, 19, 29, "refresh", None)])
         self.put(height-2, 1, self.status, curses.color_pair(4) if self.status_error else curses.A_DIM)
         self.screen.refresh()
 
@@ -287,6 +313,40 @@ class Sidebar:
             self.put(row, x, icon + badges, attr | curses.color_pair(3 if bot.get('unread') else 1), cell_width-1)
             self.put(row+1, x, bot.get('label') or bot['id'], attr, cell_width-1)
             self.hitboxes.extend((r, x, x+cell_width-1, 'bot', index) for r in (row, row+1))
+
+    def render_inbox(self, y, rows, width):
+        unread, bad = unread_summary(self.inbox)
+        title = "INBOX  " + (str(unread) + " unread" if unread else "all read")
+        if bad:
+            title += "  ·  " + str(bad) + " failed"
+        active = self.section == "inbox"
+        color = curses.color_pair(4 if bad else 3 if unread else 1)
+        self.put(y, 1, title, color | (curses.A_BOLD if unread or active else 0) | (curses.A_REVERSE if active and not rows else 0))
+        self.hitboxes.append((y, 1, width-1, "inbox_open", None))
+        if not rows:
+            return
+        if not self.inbox:
+            self.put(y+1, 2, "No cron notifications yet", curses.A_DIM)
+            return
+        if len(self.inbox) > rows:
+            span = str(self.selected["inbox"] + 1) + " / " + str(len(self.inbox))
+            self.put(y, max(1, width - len(span) - 2), span, curses.A_DIM)
+        selected, offset = self.selected["inbox"], self.offset["inbox"]
+        if selected < offset:
+            offset = selected
+        if selected >= offset+rows:
+            offset = selected-rows+1
+        offset = max(0, min(offset, max(0, len(self.inbox)-rows)))
+        self.offset["inbox"] = offset
+        for i, item in enumerate(self.inbox[offset:offset+rows], offset):
+            row = y + 1 + i - offset
+            bad_item = item["failed"] or item["delivery_failed"]
+            attr = curses.A_REVERSE if active and i == selected else 0
+            stamp = relative_time(item["run_at"]).replace(" ago", "")
+            style = curses.color_pair(4) if bad_item else curses.color_pair(3) | curses.A_BOLD if item["unread"] else curses.A_DIM
+            self.put(row, 1, ("●" if item["unread"] else " ") + " " + item["job_name"] + (" !" if bad_item else "") + " · " + stamp,
+                     attr | style)
+            self.hitboxes.append((row, 1, width-1, "inbox_item", i))
 
     def render_rows(self, section, start_y, available, row_height, width):
         rows = self.rows(section)
@@ -425,9 +485,13 @@ class Sidebar:
         elif key == curses.KEY_NPAGE:
             self.move(5)
         elif key == ord("\t"):
-            sections = ('jobs', 'conversations', 'bots')
+            sections = ('jobs', 'conversations', 'bots', 'inbox')
             self.section = sections[(sections.index(self.section)+1) % len(sections)]
             self.detail = None
+        elif key == ord('i'):
+            self.section, self.detail = 'inbox', None
+        elif key == ord('M') and self.section == 'inbox':
+            self.mark_inbox_read()
         elif key == ord('b'):
             self.section, self.detail = 'bots', None
         elif key in (ord(" "), ord("x")) and self.section == "jobs":
@@ -437,9 +501,11 @@ class Sidebar:
                 self.open_conversation()
             elif self.section == 'bots':
                 self.open_bot()
+            elif self.section == 'inbox':
+                self.open_inbox()
             else:
                 self.detail, self.detail_offset = self.current(), 0
-        elif key == ord("d") and self.section != 'bots':
+        elif key == ord("d") and self.section not in ('bots', 'inbox'):
             self.detail, self.detail_offset = self.current(), 0
         elif key == ord("e") and self.section == "jobs":
             self.edit_job()
@@ -502,6 +568,8 @@ class Sidebar:
                         self.section="conversations"
                     elif action=='bot':
                         self.section='bots'
+                    elif action=='inbox_item':
+                        self.section='inbox'
                     break
             self.move(-1 if button & curses.BUTTON4_PRESSED else 1)
             return
@@ -523,6 +591,15 @@ class Sidebar:
                     self.open_bot()
                 elif action=='bots':
                     self.section, self.detail = 'bots', None
+                elif action=='inbox':
+                    self.section, self.detail = 'inbox', None
+                elif action=='inbox_open':
+                    self.section = 'inbox'
+                    self.selected['inbox'] = next((i for i, r in enumerate(self.inbox) if r.get('unread')), 0)
+                    self.open_inbox()
+                elif action=='inbox_item':
+                    self.section, self.selected['inbox'] = 'inbox', index
+                    self.open_inbox()
                 elif action=="new":
                     self.new_chat()
                 elif action=="refresh":

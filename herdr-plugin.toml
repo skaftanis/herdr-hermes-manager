@@ -73,6 +73,12 @@ title = "Hermes Bot Chat"
 placement = "popup"
 command = ["/usr/bin/env", "python3", "hermes_manager.py", "bot-popup"]
 
+[[panes]]
+id = "inbox-popup"
+title = "Hermes Cron Inbox"
+placement = "popup"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "inbox-popup"]
+
 [[build]]
 command = ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
 

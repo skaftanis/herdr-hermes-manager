@@ -216,7 +216,10 @@ async function daemon(initialConfig) {
   }
 }
 
-export async function chat(config, profile) {
+// A stored session id is always "<profile-owned>"; refuse anything that is not a plain identifier.
+export const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+
+export async function chat(config, profile, session, label) {
   if (!config.profiles.includes(profile)) throw new Error('Unknown Hermes profile');
   emit({type:'status',text:'Connecting to Hermes…'});
   const connection = await connect(config);
@@ -224,20 +227,22 @@ export async function chat(config, profile) {
   const {profiles} = await rpc.call('profiles.list', {});
   const bot = (profiles ?? []).find(p => p.name === profile);
   if (!bot) throw new Error('Hermes profile was removed');
-  if (!bot.ui_meta?.['hermes-bots']) {
+  if (session !== undefined && !SESSION_ID.test(session)) throw new Error('Invalid session id');
+  // With an explicit session this chat continues that exact conversation (a cron run), in place.
+  if (session === undefined && !bot.ui_meta?.['hermes-bots']) {
     const result = await rpc.call('profiles.configure', {name:profile,
       ui_meta:{'hermes-bots':{shape:'star',title:bot.display_name || config.labels?.[profile] || profile}},
       ui_meta_expected_revisions:{'hermes-bots':bot.ui_meta_revisions?.['hermes-bots'] ?? 0}});
     if (result.applied?.ui_meta_conflicts) throw new Error('Bot metadata changed concurrently. Retry.');
   }
-  const row = await canonical(rpc,profile,bot.canonical_session);
+  const row = session === undefined ? await canonical(rpc,profile,bot.canonical_session) : {id:session};
   const stored = row.resolved_id || row.id;
   let runtime;
   rpc.onEvent = event => {
     if (runtime && event?.session_id && event.session_id !== runtime) return;
     if (event?.type === 'request.cancel') { const id = event.payload?.id || event.payload?.request_id; openRequests.delete(id); }
     emit({type:'event',event});
-    if (event?.type === 'message.complete' || event?.type === 'turn.end') markRead(connection,profile,stored).catch(() => {});
+    if (session === undefined && (event?.type === 'message.complete' || event?.type === 'turn.end')) markRead(connection,profile,stored).catch(() => {});
   };
   const openRequests = new Map();
   rpc.onRequest = frame => {
@@ -247,8 +252,8 @@ export async function chat(config, profile) {
   await rpc.call('client.capabilities',{server_requests:true});
   const resumed = await rpc.call('session.resume',{profile,session_id:stored,source:'tui',inline_images:false});
   runtime = resumed.session_id;
-  emit({type:'session',session:resumed,title:rosterItem(bot,row,config.labels?.[profile]).label});
-  await markRead(connection,profile,stored).catch(() => emit({type:'status',text:'Connected; shared badge could not be cleared.'}));
+  emit({type:'session',session:resumed,title:session === undefined ? rosterItem(bot,row,config.labels?.[profile]).label : clean(label || 'Cron run')});
+  if (session === undefined) await markRead(connection,profile,stored).catch(() => emit({type:'status',text:'Connected; shared badge could not be cleared.'}));
   for (const frame of resumed.open_requests ?? []) {
     // Replayed requests retain their original ids and method, never auto-answer.
     if (frame.id && frame.method) { openRequests.set(frame.id,frame); emit({type:'request',request:frame}); }
@@ -265,7 +270,8 @@ export async function chat(config, profile) {
         if (text.startsWith('/')) {
           // Bot Chats are continuous: reset gestures compact the same session.
           if (/^\/title\s+\S/.test(text)) throw new Error('Bot Chat keeps its canonical title. Rename the bot in Hermes Desktop.');
-          if (/^\/(resume|branch|fork|profile|delete)(\s|$)/.test(text)) throw new Error('This popup stays in this Bot Chat. Use a workspace terminal for other sessions or profiles.');
+          if (/^\/(resume|branch|fork|profile|delete)(\s|$)/.test(text)) throw new Error('This popup stays in this conversation. Use a workspace terminal for other sessions or profiles.');
+          if (session !== undefined && /^\/(new|reset|clear)(\s|$)/.test(text)) throw new Error('This continues the cron run in place; /new is disabled here.');
           const command = /^\/(new|reset|clear)(\s|$)/.test(text) ? '/compress' : text;
           const result = await rpc.call('slash.exec',{profile,session_id:runtime,command});
           if (result.type === 'skill' && result.message) {
@@ -277,7 +283,7 @@ export async function chat(config, profile) {
       } else if (input.type === 'refresh') {
         const snapshot = await rpc.call('session.resume',{profile,session_id:stored,source:'tui',inline_images:false});
         runtime = snapshot.session_id; emit({type:'session',session:snapshot});
-        await markRead(connection,profile,stored).catch(() => {});
+        if (session === undefined) await markRead(connection,profile,stored).catch(() => {});
       }
     } catch (error) { emit({type:'error',text:error.message}); }
   }
@@ -285,9 +291,9 @@ export async function chat(config, profile) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [mode, configFile, profile] = process.argv.slice(2);
+  const [mode, configFile, profile, session, label] = process.argv.slice(2);
   const config = JSON.parse(fs.readFileSync(configFile,'utf8'));
-  (mode === 'daemon' ? daemon(config) : chat(config,profile)).catch(error => {
+  (mode === 'daemon' ? daemon(config) : chat(config,profile,session || undefined,label)).catch(error => {
     emit({type:'error',text:error.message}); process.exitCode = 1;
   });
 }

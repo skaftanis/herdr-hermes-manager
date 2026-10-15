@@ -95,12 +95,13 @@ def message_text(value):
 
 
 class BotPopup:
-    def __init__(self, settings, profile):
-        self.settings, self.profile = settings, profile
+    def __init__(self, settings, profile, session=None, label=None):
+        # With ``session`` the popup continues that exact stored conversation (e.g. a cron run) in place.
+        self.settings, self.profile, self.session = settings, profile, session
         self.events = queue.Queue()
         self.messages, self.requests = [], []
         self.draft, self.cursor, self.scroll = '', 0, 0
-        self.status, self.title = 'Connecting…', profile.title
+        self.status, self.title = 'Connecting…', label or profile.title
         self.ready, self.busy = False, False
         self.stream = ''
         self.answers = {}
@@ -193,7 +194,8 @@ class BotPopup:
         with log_file.open('ab') as log:
             os.chmod(log_file, 0o600)
             self.child = subprocess.Popen([node, str(BRIDGE), 'chat', str(self.settings.state_dir / 'bots-runtime.json'),
-                                           self.profile.name], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                           self.profile.name, *([self.session, self.title] if self.session else [])],
+                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                           stderr=log, text=True, bufsize=1)
             threading.Thread(target=self.read_events, daemon=True).start()
             threading.Thread(target=self.write_commands, daemon=True).start()
@@ -237,11 +239,11 @@ class BotPopup:
             self.messages = [(m.get('role', 'assistant'), message_text(m.get('content') or m.get('text')))
                              for m in session.get('messages', []) if m.get('role') in ('user', 'assistant')
                              and m.get('display_kind') != 'hidden']
-            self.title = item.get('title', self.title)
+            self.title = item.get('title', self.title) if not self.session else self.title
             self.ready, self.busy = True, bool(session.get('running'))
             if self.busy and self.turn_started is None:
                 self.turn_started = time.monotonic()
-            self.status = 'Connected · continuous Bot Chat'
+            self.status = 'Connected · continuing this cron run' if self.session else 'Connected · continuous Bot Chat'
             inflight = session.get('inflight') or {}
             self.stream = message_text(inflight.get('text'))
         elif kind in ('status', 'error'):
@@ -283,7 +285,7 @@ class BotPopup:
                 text = message_text(payload.get('text')) or self.stream
                 if text: self.messages.append(('assistant', text))
                 self.stream, self.busy = '', False
-                self.status = clean_text(payload.get('error') or 'Ready · continuous Bot Chat', 300)
+                self.status = clean_text(payload.get('error') or ('Ready · continuing this cron run' if self.session else 'Ready · continuous Bot Chat'), 300)
                 self.send({'type': 'refresh'})
             elif name in ('session.reclaimed', 'session.compacted'):
                 self.send({'type': 'refresh'})

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {canonical,rosterItem,TITLE} from '../hermes_manager/bots_bridge.mjs';
+import {canonical,rosterItem,SESSION_ID,TITLE} from '../hermes_manager/bots_bridge.mjs';
 
 test('existing hidden canonical chat and compression tip are reused without a model prompt', async () => {
   const calls=[];
@@ -36,4 +36,9 @@ test('bot icons use shared unread state and sanitize labels',()=>{
   const row=rosterItem({name:'alpha',ui_meta:{'hermes-bots':{title:'Test\x1bBot',shape:'star'}}},{unread:true});
   assert.equal(row.id,'alpha');assert.equal(row.icon,'✦');assert.equal(row.unread,true);
   assert.ok(!row.label.includes('\x1b'));
+});
+
+test('only plain stored session ids may be continued', () => {
+  assert.ok(SESSION_ID.test('cron_5c1c438283c9_20261015_140046'));
+  for (const bad of ['', '../x', 'a b', 'a;rm', '-x', 'x'.repeat(200)]) assert.ok(!SESSION_ID.test(bad), bad);
 });

@@ -67,7 +67,7 @@ def main():
             route(rest, inspect=argv[0] == "route-inspect")
             return
         parser = argparse.ArgumentParser(description="Hermes profile manager for Herdr")
-        parser.add_argument("command", choices=("initialize", "doctor", "sync", "refresh", "sidebar", "focus", "new-chat", "open", "inspect", "bots-sync", "bot-open", "bot-popup"))
+        parser.add_argument("command", choices=("initialize", "doctor", "sync", "refresh", "sidebar", "focus", "new-chat", "open", "inspect", "bots-sync", "bot-open", "bot-popup", "inbox-popup"))
         parser.add_argument("--force", action="store_true")
         parser.add_argument("--profile")
         parser.add_argument("--session")
@@ -99,6 +99,13 @@ def main():
         elif args.command == "focus":
             result = manager.focus_sidebar()
         else:
+            if args.command == "inbox-popup":
+                from .inbox import InboxPopup
+                key = os.environ.get("HERDR_HERMES_INBOX_RUN")
+                if not key:
+                    raise ValueError("No cron run selected")
+                InboxPopup(settings, key).run()
+                return
             name = args.profile or (os.environ.get("HERDR_HERMES_PROFILE") if args.command == "sidebar" else os.environ.get("HERDR_HERMES_BOT") if args.command == "bot-popup" else None)
             profile = settings.profile(name) if name else current_profile(api, settings)
             if not profile:
