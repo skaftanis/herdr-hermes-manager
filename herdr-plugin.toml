@@ -1,0 +1,95 @@
+id = "hhl.hermes-manager"
+name = "Hermes Manager"
+version = "0.3.0"
+min_herdr_version = "0.9.3"
+description = "Hermes profile workspaces, cron controls, recent conversations, and continuous Bot chat popups."
+platforms = ["macos"]
+
+[[startup]]
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "initialize"]
+
+[[actions]]
+id = "sync"
+title = "Hermes: sync all profile workspaces"
+contexts = ["global", "workspace"]
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync", "--force"]
+
+[[actions]]
+id = "sidebar"
+title = "Hermes: focus profile manager"
+contexts = ["workspace", "pane"]
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "focus"]
+
+[[actions]]
+id = "new-chat"
+title = "Hermes: new conversation in this profile"
+contexts = ["workspace", "pane"]
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "new-chat"]
+
+[[panes]]
+id = "manager"
+title = "Hermes Manager"
+placement = "split"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sidebar"]
+
+[[events]]
+on = "workspace.created"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync"]
+
+[[events]]
+on = "workspace.closed"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync"]
+
+[[events]]
+on = "workspace.focused"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync"]
+
+[[events]]
+on = "worktree.created"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync"]
+
+[[events]]
+on = "tab.created"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync"]
+
+[[events]]
+on = "tab.focused"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync"]
+
+[[events]]
+on = "pane.closed"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "sync"]
+
+
+[[actions]]
+id = "bots"
+title = "Hermes: open this profile’s Bot Chat"
+contexts = ["workspace", "pane"]
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "bot-open"]
+
+[[panes]]
+id = "bot-chat"
+title = "Hermes Bot Chat"
+placement = "popup"
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "bot-popup"]
+
+[[build]]
+command = ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
+
+[[actions]]
+id = "setup"
+title = "Hermes: set up shell routing and activate"
+contexts = ["global"]
+command = ["/usr/bin/env", "python3", "install.py", "--activate"]
+
+[[actions]]
+id = "doctor"
+title = "Hermes: check requirements"
+contexts = ["global"]
+command = ["/usr/bin/env", "python3", "hermes_manager.py", "doctor"]
+
+[[actions]]
+id = "remove-setup"
+title = "Hermes: remove shell setup and disable"
+contexts = ["global"]
+command = ["/usr/bin/env", "python3", "uninstall.py"]

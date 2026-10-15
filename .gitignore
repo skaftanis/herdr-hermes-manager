@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.test-output/
+node_modules/
+dist/
+.env
+.env.*
+*.log
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+# Local migration/rollback resources from the pre-plugin UI prototype.
+install_bots_ui.py
+restore_stock_ui.py
+herdr-bots-ui.patch
+scripts/migrate_manager_bots.py
+scripts/verify_live.py

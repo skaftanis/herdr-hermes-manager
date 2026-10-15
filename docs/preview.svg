@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="740" viewBox="0 0 480 740" role="img" aria-label="Illustrative Hermes Manager">
+<rect width="480" height="740" rx="12" fill="#1e1e2e"/>
+<rect x="12" y="12" width="456" height="716" rx="5" fill="none" stroke="#89b4fa"/>
+<text x="26" y="40" fill="#89b4fa" font-family="monospace" font-size="15">Hermes Manager</text>
+<text x="26" y="72" fill="#89dceb" font-family="monospace" font-size="14">HERMES / Research</text>
+<text x="26" y="95" fill="#9399b2" font-family="monospace" font-size="14">research</text>
+<text x="26" y="141" fill="#89dceb" font-family="monospace" font-size="14">CRON JOBS  2/3 on</text>
+<text x="26" y="164" fill="#a6e3a1" font-family="monospace" font-size="14">[ ON ] Daily research digest</text>
+<text x="26" y="187" fill="#9399b2" font-family="monospace" font-size="14">       every day at 09:00</text>
+<text x="26" y="210" fill="#a6e3a1" font-family="monospace" font-size="14">[ ON ] Weekly reading list</text>
+<text x="26" y="233" fill="#9399b2" font-family="monospace" font-size="14">       Fridays at 16:00</text>
+<text x="26" y="256" fill="#f9e2af" font-family="monospace" font-size="14">[off ] Project check-in</text>
+<text x="26" y="279" fill="#9399b2" font-family="monospace" font-size="14">       paused</text>
+<text x="26" y="325" fill="#89dceb" font-family="monospace" font-size="14">RECENT CONVERSATIONS</text>
+<text x="26" y="348" fill="#cdd6f4" font-family="monospace" font-size="14">Plan the next research sprint</text>
+<text x="26" y="371" fill="#9399b2" font-family="monospace" font-size="14">  desktop · 2h ago</text>
+<text x="26" y="394" fill="#cdd6f4" font-family="monospace" font-size="14">Summarize this week’s findings</text>
+<text x="26" y="417" fill="#9399b2" font-family="monospace" font-size="14">  tui · 1d ago</text>
+<text x="26" y="440" fill="#cdd6f4" font-family="monospace" font-size="14">Notes for the next draft</text>
+<text x="26" y="463" fill="#9399b2" font-family="monospace" font-size="14">  cli · 2d ago</text>
+<text x="26" y="509" fill="#89dceb" font-family="monospace" font-size="14">BOTS  6</text>
+<text x="26" y="532" fill="#89dceb" font-family="monospace" font-size="14">✦ ●          ◉ ↻          ▢</text>
+<text x="26" y="555" fill="#cdd6f4" font-family="monospace" font-size="14">Research     Writing      Planning</text>
+<text x="26" y="601" fill="#89dceb" font-family="monospace" font-size="14">✦            ◉            ▢</text>
+<text x="26" y="624" fill="#cdd6f4" font-family="monospace" font-size="14">Learning     Projects     Personal</text>
+<text x="26" y="670" fill="#9399b2" font-family="monospace" font-size="14">Tab switch · b bots · Enter open</text>
+<text x="26" y="693" fill="#9399b2" font-family="monospace" font-size="14">Click a bot to continue its chat</text>
+<line x1="26" y1="120" x2="454" y2="120" stroke="#45475a"/>
+<line x1="26" y1="315" x2="454" y2="315" stroke="#45475a"/>
+<line x1="26" y1="522" x2="454" y2="522" stroke="#45475a"/>
+<line x1="26" y1="660" x2="454" y2="660" stroke="#45475a"/>
+</svg>

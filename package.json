@@ -1,0 +1,10 @@
+{
+  "name": "herdr-hermes-manager",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Hermes profile workspaces, cron controls and continuous Bot chats for Herdr",
+  "license": "MIT",
+  "engines": {"node": ">=22"},
+  "scripts": {"test": "node --test tests/bots_bridge.test.mjs tests/bots_transport.test.mjs"},
+  "dependencies": {"ws": "8.22.0"}
+}
