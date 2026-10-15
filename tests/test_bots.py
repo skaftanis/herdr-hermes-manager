@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 from pathlib import Path
-from hermes_manager.bots import BotPopup, message_text, open_bot, BRIDGE
+from hermes_manager.bots import BotPopup, message_text, open_bot, configure_bots, BRIDGE
 from hermes_manager.core import Profile
 from hermes_manager.bots_activity import activity
 import sqlite3
@@ -9,9 +9,30 @@ import tempfile
 import subprocess
 import sys
 import time
+import hashlib
+from types import SimpleNamespace
+from hermes_manager.core import read_json, write_json
 
 
 class BotPopupTests(unittest.TestCase):
+    def test_bot_open_from_running_manager_with_pre_packaging_settings(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            profile = Profile('alpha', root, 'Alpha', root)
+            # Exactly the old Settings shape: no agent_root or host_config.
+            settings = SimpleNamespace(root=root, state_dir=root/'state', config={},
+                hermes_bin=root/'hermes', plugin_id='hhl.hermes-manager', profiles=lambda: [profile])
+            write_json(settings.state_dir/'bots-worker.json', {'pid': 123,
+                'revision': hashlib.sha256(BRIDGE.read_bytes()).hexdigest()})
+            api = Mock(socket_path=str(root/'herdr.sock'))
+            with patch('hermes_manager.bots.os.kill'), patch.dict('os.environ', {'XDG_CONFIG_HOME':str(root/'config')}):
+                open_bot(settings, api, profile)
+            runtime = read_json(settings.state_dir/'bots-runtime.json')
+            self.assertEqual(runtime['agent_root'], str(root/'hermes-agent'))
+            self.assertEqual(runtime['profiles'], ['alpha'])
+            api.call.assert_called_once()
+            self.assertEqual(api.call.call_args[0][1]['env']['HERDR_HERMES_BOT'], 'alpha')
+
     def test_selection_extracts_multiline_unicode_in_either_direction(self):
         p = self.popup()
         p.visible_text = {3: 'Hello κόσμε', 4: 'Second line'}

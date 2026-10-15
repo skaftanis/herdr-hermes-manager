@@ -12,6 +12,7 @@ import unicodedata
 
 from .core import clean_text, job_enabled, load_conversations, load_jobs, read_json
 from .control import manager_pane
+from .bots import open_bot
 
 
 def relative_time(value):
@@ -131,7 +132,6 @@ class Sidebar:
         return [saved.get(p.name, {'id': p.name, 'label': p.title, 'icon': '✦'}) for p in profiles]
 
     def open_bot(self):
-        from .bots import open_bot
         bot = self.current('bots')
         if bot:
             profile = self.manager.settings.profile(bot['id'])

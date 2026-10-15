@@ -24,7 +24,11 @@ BRIDGE = Path(__file__).with_name('bots_bridge.mjs')
 def configure_bots(settings, api):
     settings.state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     config_file = settings.state_dir / 'bots-runtime.json'
-    config = {'root': str(settings.root), 'agent_root': str(settings.agent_root), 'python_bin': sys.executable,
+    # Linked-source updates can leave an older Settings instance in a running
+    # Manager. Keep Bot startup compatible until those panes are refreshed.
+    agent_root = getattr(settings, 'agent_root', Path(settings.config.get('agent_root') or settings.root / 'hermes-agent').expanduser())
+    host_config = getattr(settings, 'host_config', Path(os.environ.get('XDG_CONFIG_HOME') or Path.home()/'.config') / 'herdr')
+    config = {'root': str(settings.root), 'agent_root': str(agent_root), 'python_bin': sys.executable,
               'hermes_bin': str(settings.hermes_bin), 'state_dir': str(settings.state_dir),
               'roster_file': str(settings.state_dir / 'bots-roster.json'),
               'herdr_socket': api.socket_path, 'plugin_id': settings.plugin_id,
@@ -32,7 +36,7 @@ def configure_bots(settings, api):
               'labels': {p.name: p.title for p in settings.profiles()}}
     if read_json(config_file) != config:
         write_json(config_file, config)
-    sidebar_file = settings.host_config / 'sidebar-sections.json'
+    sidebar_file = host_config / 'sidebar-sections.json'
     sections = read_json(sidebar_file, [])
     if not isinstance(sections, list):
         raise ValueError('Invalid sidebar-sections.json')

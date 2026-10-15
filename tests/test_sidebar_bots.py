@@ -57,7 +57,7 @@ class SidebarBotsTests(unittest.TestCase):
             self.assertEqual(len(sidebar.load_bots()), 1)
             self.assertTrue(sidebar.load_bots()[0]['unread'])
 
-    @patch('hermes_manager.bots.open_bot')
+    @patch('hermes_manager.ui.open_bot')
     def test_bot_launch_is_profile_scoped(self, opened):
         sidebar = self.sidebar()
         sidebar.selected['bots'] = 4
